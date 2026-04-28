@@ -33,6 +33,74 @@
 /* --app-text-scale is updated via the UI Scale slider (Interface.svelte) */
 :root {
 	--app-text-scale: 1;
+
+	/* Freiheit Media brand color */
+	--brand-color: #1e40af;
+	--brand-color-hover: #1d4ed8;
+}
+
+/* Freiheit Media – top banner shown on top of the app shell */
+.fm-brand-banner {
+	background-color: var(--brand-color);
+	color: #ffffff;
+	font-size: 0.75rem;
+	letter-spacing: 0.04em;
+	font-weight: 600;
+	padding: 6px 12px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	width: 100%;
+	flex: none;
+}
+
+.fm-brand-banner .fm-brand-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 9999px;
+	background-color: #ffffff;
+	opacity: 0.9;
+}
+
+/* Small environment badge shown above the user menu in the sidebar */
+.fm-env-badge {
+	margin: 0 4px 6px 4px;
+	padding: 6px 10px;
+	border-radius: 10px;
+	font-size: 0.72rem;
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--brand-color);
+	background-color: rgba(30, 64, 175, 0.08);
+	border: 1px solid rgba(30, 64, 175, 0.2);
+}
+
+.dark .fm-env-badge {
+	color: #93c5fd;
+	background-color: rgba(30, 64, 175, 0.18);
+	border-color: rgba(96, 165, 250, 0.25);
+}
+
+.fm-env-badge .fm-env-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 9999px;
+	background-color: #16a34a;
+	box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18);
+}
+
+/* Brand-colored primary auth button */
+.fm-brand-btn {
+	background-color: var(--brand-color);
+	color: #ffffff;
+	transition: background-color 150ms ease;
+}
+
+.fm-brand-btn:hover {
+	background-color: var(--brand-color-hover);
 }
 
 html {

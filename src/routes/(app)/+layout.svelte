@@ -392,9 +392,15 @@
 {/if}
 
 {#if $user}
-	<div class="app relative">
+	<div class="app relative flex flex-col h-screen max-h-[100dvh]">
+		<!-- Freiheit Media – Internal LLM banner (custom UI element) -->
+		<div class="fm-brand-banner" role="note" aria-label="Freiheit Media internal deployment">
+			<span class="fm-brand-dot"></span>
+			<span>Freiheit Media – Internal LLM</span>
+		</div>
+
 		<div
-			class=" text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-900 h-screen max-h-[100dvh] overflow-auto flex flex-row justify-end"
+			class=" text-gray-700 dark:text-gray-100 bg-white dark:bg-gray-900 flex-1 min-h-0 overflow-auto flex flex-row justify-end"
 		>
 			{#if !['user', 'admin'].includes($user?.role)}
 				<AccountPending />

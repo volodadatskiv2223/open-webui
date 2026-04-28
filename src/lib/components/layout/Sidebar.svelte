@@ -1595,6 +1595,11 @@
 					class=" sidebar-bg-gradient-to-t bg-linear-to-t from-gray-50 dark:from-gray-950 to-transparent from-50% pointer-events-none absolute inset-0 -z-10 -mt-6"
 				></div>
 				<div class="flex flex-col font-primary">
+					<!-- Freiheit Media – environment indicator (custom UI element) -->
+					<div class="fm-env-badge" aria-label="Deployment environment">
+						<span class="fm-env-dot"></span>
+						<span>Environment: Local Test</span>
+					</div>
 					{#if $user !== undefined && $user !== null}
 						<UserMenu
 							role={$user?.role}

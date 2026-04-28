@@ -1,4 +1,230 @@
-# Open WebUI 👋
+# Freiheit Media – Open WebUI Fork
+
+> Forked from [open-webui/open-webui](https://github.com/open-webui/open-webui).
+> This fork adds light brand customization for an internal Freiheit Media test
+> deployment and a written conceptual answer for the second part of the task.
+
+The original upstream README starts further below.
+
+## 1. Setup
+
+Tested on macOS 14 with Docker Desktop 29.3 and Docker Compose v2.
+
+```bash
+# 1. clone the fork
+git clone https://github.com/volodadatskiv2223/open-webui.git
+cd open-webui
+
+# 2. build & start (Open WebUI + bundled Ollama)
+docker compose up -d --build
+
+# 3. open the UI
+open http://localhost:3000
+```
+
+The first build takes a few minutes because the SvelteKit frontend is compiled
+from source (so the UI changes in this fork end up in the container image).
+
+To stop / clean up:
+
+```bash
+docker compose down            # stop containers, keep data
+docker compose down -v         # stop containers and wipe volumes
+```
+
+If you do not want the bundled Ollama service, the simpler one-liner from the
+upstream README also works (but will *not* include the brand changes, since it
+pulls the official image):
+
+```bash
+docker run -d -p 3000:8080 -v open-webui:/app/backend/data \
+  --name open-webui ghcr.io/open-webui/open-webui:main
+```
+
+## 2. UI changes (Part A)
+
+Two small, code-level modifications. All changes are confined to the
+SvelteKit frontend — no upstream behaviour is altered.
+
+### 2.1 Branding change — primary color
+
+The login / sign-up button (the most visible call-to-action on first contact
+with the app) now uses the Freiheit Media brand blue **`#1E40AF`** instead of
+the muted gray default.
+
+- New CSS custom properties `--brand-color` and `--brand-color-hover` and a
+  reusable `.fm-brand-btn` class added in [`src/app.css`](src/app.css).
+- The `Sign in` / `Create Account` / `Authenticate` buttons in
+  [`src/routes/auth/+page.svelte`](src/routes/auth/+page.svelte) switched to
+  the new class.
+
+### 2.2 Custom UI elements
+
+Two small, static elements that make the deployment context obvious to any
+user landing in the app:
+
+1. **Top banner** — a slim brand-blue strip rendered on top of the app shell
+   reading *"Freiheit Media – Internal LLM"*. Implemented inside the `(app)`
+   route layout
+   [`src/routes/(app)/+layout.svelte`](src/routes/%28app%29/+layout.svelte)
+   and styled via `.fm-brand-banner` in `src/app.css`. The shell layout was
+   converted from a single `flex-row` container to a `flex-col` parent with
+   the banner as the first child and the existing sidebar/content row as the
+   second child, so the banner does not overlap the sidebar.
+2. **Sidebar environment badge** — a small pill labelled
+   *"Environment: Local Test"* with a green status dot, placed directly above
+   the user menu at the bottom of the sidebar. Implemented in
+   [`src/lib/components/layout/Sidebar.svelte`](src/lib/components/layout/Sidebar.svelte)
+   and styled via `.fm-env-badge` in `src/app.css`.
+
+### 2.3 Files touched
+
+| File | Change |
+|------|--------|
+| `src/app.css` | Brand CSS variables, `.fm-brand-banner`, `.fm-env-badge`, `.fm-brand-btn` styles |
+| `src/routes/auth/+page.svelte` | Auth submit buttons re-skinned with `.fm-brand-btn` |
+| `src/routes/(app)/+layout.svelte` | Top banner + flex-column layout wrap |
+| `src/lib/components/layout/Sidebar.svelte` | Environment badge above user menu |
+
+## 3. Part B — RAG answer quality & customer safety
+
+Scenario: each customer has its own Knowledge Base (KB) and the model is, at
+any given time, bound to exactly **one** customer's KB.
+
+### 3.1 System prompt
+
+```text
+You are Freiheit Media's internal assistant for the customer whose Knowledge
+Base is currently attached to this conversation. Treat that Knowledge Base as
+the only authoritative source.
+
+Hard rules:
+1. Use ONLY the retrieved excerpts from the active Knowledge Base. Do not use
+   prior knowledge, training data, public web facts, or anything from other
+   customers' Knowledge Bases.
+2. For every user question, classify the available evidence into exactly one
+   of three states and answer accordingly:
+   - FULL: every required fact is explicitly present in the retrieved
+     excerpts. Answer directly and concisely.
+   - PARTIAL: some required facts are present, others are missing. State what
+     is supported by the KB, then explicitly list what is missing and stop.
+     Do not fill the gap from outside knowledge.
+   - NONE: no relevant excerpt was retrieved. Reply that the active Knowledge
+     Base does not contain information on this topic and suggest the user
+     contact the document owner. Do not guess.
+3. Never speculate, infer beyond the text, or extrapolate numbers, dates,
+   prices, names, policies or procedures that are not literally written in
+   the retrieved excerpts.
+4. Reference sources minimally and only when they add value. Use the format
+   "Based on <Document Title>" or "(<Document Title>, p.X)". Never invent
+   document titles or page numbers.
+5. If the user asks about another customer, organisation or unrelated topic,
+   refuse and remind them that this assistant is scoped to a single
+   Knowledge Base.
+6. If retrieved excerpts contradict each other, say so explicitly and quote
+   the conflicting passages instead of picking one.
+7. Answer in the user's language. Do not invent links, file paths, contacts
+   or identifiers.
+
+Output format:
+- 1–6 sentences for FULL answers, bullet points only when listing items that
+  are themselves bulleted in the source.
+- Always end PARTIAL or NONE answers with a single line starting with
+  "Missing in KB:" describing what was not found.
+```
+
+### 3.2 Three example user questions and expected answers
+
+Assume the active KB belongs to customer *Acme GmbH* and contains, among
+others, an *"Onboarding Guide – 2024"* and an *"IT Security Policy v3"*.
+
+**Q1 (FULL answer available)**
+> "How many vacation days does a new employee at Acme get in their first
+> year?"
+
+Expected answer:
+> New Acme employees are entitled to 26 paid vacation days in their first
+> calendar year, prorated by start date.
+> Based on *Onboarding Guide – 2024*.
+
+**Q2 (PARTIAL answer)**
+> "What's the process for requesting a company laptop and how long does
+> approval usually take?"
+
+Expected answer:
+> The Knowledge Base describes the request flow: the employee opens a ticket
+> in the IT portal, their line manager approves it, and IT provisions the
+> device. Based on *IT Security Policy v3*.
+>
+> Missing in KB: typical approval time is not stated in the active Knowledge
+> Base. Please confirm with the IT team.
+
+**Q3 (NONE — no information available)**
+> "What is Acme's revenue forecast for Q4 2026?"
+
+Expected answer:
+> The active Knowledge Base does not contain information about Acme's Q4 2026
+> revenue forecast. I cannot answer this from the documents available to me;
+> please reach out to the Finance team or the document owner.
+>
+> Missing in KB: financial forecasts for 2026.
+
+### 3.3 Why this approach improves reliability
+
+- **Hard scoping to the active KB** is the single most effective guardrail
+  against the most dangerous failure mode in a multi-tenant setup: leaking or
+  mixing one customer's information into another customer's session. Pinning
+  "only the retrieved excerpts" closes the easy attack surface where the
+  model would otherwise fall back to its pre-training memory.
+- **Three explicit evidence states (FULL / PARTIAL / NONE)** force the model
+  to be honest about coverage instead of producing a single confident-looking
+  answer regardless of how strong the evidence actually is. This is the
+  classic defence against *fluent hallucination* — answers that read well but
+  invent facts.
+- **"Missing in KB:" tail line** gives the user (and any downstream
+  automation) a deterministic, easy-to-detect signal that the answer is
+  incomplete or unsupported, instead of having to interpret natural language.
+- **Minimal, explicit source references** keep the answer scannable and let
+  the user verify quickly, while the rule "never invent titles/pages" blocks
+  one of the most common RAG hallucinations: fabricated citations.
+- **Refusal on cross-customer or off-topic questions** keeps the assistant's
+  behaviour predictable and auditable, which matters more in a B2B internal
+  tool than raw helpfulness.
+
+### 3.4 Failure modes this prompt prevents
+
+| Failure mode | How it is prevented |
+|---|---|
+| Cross-customer leakage | Rule 1 forbids any source other than the active KB; rule 5 forces a refusal on cross-customer questions. |
+| Confident hallucinated facts | Rules 2–3 force the FULL / PARTIAL / NONE classification and forbid filling gaps from prior knowledge. |
+| Fabricated citations | Rule 4 restricts the citation format and forbids invented titles or page numbers. |
+| Silent partial answers | Rule 2 requires PARTIAL answers to explicitly list what is missing, plus the mandatory `Missing in KB:` line. |
+| Contradictions hidden from the user | Rule 6 requires surfacing conflicting passages instead of silently choosing one. |
+| Prompt injection from a document ("ignore previous instructions") | The system prompt's hard rules are stated as non-overridable; can be reinforced operationally by sanitising retrieved chunks and never executing instructions inside them. |
+
+### 3.5 Possible future improvements
+
+- **Structured output** — return a JSON object `{state: FULL|PARTIAL|NONE,
+  answer, citations[], missing[]}`. This makes the assistant directly
+  consumable from automation, evaluation harnesses and analytics pipelines
+  without parsing free text.
+- **Retrieval guardrails on top of prompting** — enforce a similarity-score
+  threshold so that "no good chunks retrieved" deterministically maps to
+  state `NONE` even before the model is invoked, instead of relying on the
+  model's self-assessment.
+- **Per-customer KB isolation at the storage layer**, not only via prompt —
+  separate vector indices (or hard tenant-id filters on every query) so
+  leakage is impossible by construction, not only by instruction.
+- **Citation verification step** — a lightweight post-processing pass that
+  checks every cited document title actually exists in the active KB and
+  rejects the answer otherwise.
+- **Eval set per customer** — a small, manually curated set of FULL / PARTIAL
+  / NONE questions per customer KB, run on every model or prompt change to
+  catch regressions early.
+
+---
+
+
 
 ![GitHub stars](https://img.shields.io/github/stars/open-webui/open-webui?style=social)
 ![GitHub forks](https://img.shields.io/github/forks/open-webui/open-webui?style=social)
